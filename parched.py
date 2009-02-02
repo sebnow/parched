@@ -29,6 +29,7 @@ metadata about package.
 
 import tarfile
 from datetime import datetime
+import re
 
 __all__ = ['Package', 'PacmanPackage', 'PKGBUILD']
 
@@ -252,7 +253,193 @@ class PacmanPackage(Package):
 
 
 class PKGBUILD(Package):
-    build = None
-    maintainer = None
-    pass
+    """A :manpage:`PKGBUILD(5)` parser
+
+    The :class:`PKGBUILD` class provides information about a
+    package by parsing a :manpage:`PKGBUILD(5)` file.
+
+    To instantiate a :class:`PacmanPackage` object, pass the package's file
+    path in the constructor::
+
+        >>> import parched
+        >>> package = PKGBUILD("PKGBUILD")
+
+    If *fileobj* is specified, it is used as an alternative to a
+    :class:`file` like object opened for *name*. It is supposed to be
+    at position 0. For example::
+
+        >>> f = open("PKGBUILD", "r")
+        >>> package = PKGBUILD(fileobj=f)
+        >>> f.close()
+
+    .. note::
+
+        *fileobj* is not closed.
+
+    The packages metadata can then be accessed directly::
+
+        >>> print package
+        "foo 1.0-1"
+        >>> print package.description
+        "Example package"
+
+    In addition to the attributes provided by :class:`Package`,
+    :class:`PKGBUILD` provides the following attributes:
+
+    .. attribute:: install
+
+        The filename of the install scriptlet.
+
+    .. attribute:: checksums
+
+        A dictionary containing the checksums of files in the
+        :attr:`sources` list. The dictionary's keys are the algorithms
+        used, and can be any of 'md5', 'sha1', 'sha256', 'sha384', and
+        'sha512'. The value is a list of checksums. The elements
+        correspond to files in the :attr:`sources` list, in relation to
+        their position.
+
+    .. attribute:: sources
+
+        A list containing the URIs of filenames. Local file paths can be
+        relative and do not require a protocol prefix.
+
+    .. attribute:: makedepends
+
+        A list of compile-time dependencies.
+
+    .. attribute:: noextract
+
+        A list of files not to be extracted. These files correspond to
+        the basenames of the URIs in :attr:`sources`
+
+    """
+    install = ""
+    checksums = {
+        'md5': [],
+        'sha1': [],
+        'sha256': [],
+        'sha384': [],
+        'sha512': [],
+    }
+    noextract = []
+    sources = []
+    makedepends = []
+
+    # Symbol lookup table
+    _var_map = {
+        'pkgname': 'name',
+        'pkgver': 'version',
+        'pkgdesc': 'description',
+        'pkgrel': 'release',
+        'source': 'sources',
+        'arch': 'architectures',
+        'license': 'licenses',
+    }
+    _array_fields = (
+        'license',
+        'source',
+        'noextract',
+        'groups',
+        'arch',
+        'backup',
+        'depends',
+        'makedepends',
+        'optdepends',
+        'conflicts',
+        'provides',
+        'replaces',
+        'options',
+        'noextract',
+    )
+    _checksum_fields = (
+        'md5sums',
+        'sha1sums',
+        'sha256sums',
+        'sha384sums',
+        'sha512sums',
+    )
+    _symbol_regex = re.compile(r"\$(?P<name>{[\w\d_]+}|[\w\d]+)")
+
+    def __init__(self, name=None, fileobj=None):
+        if not name and not fileobj:
+            raise ValueError("nothing to open")
+        should_close = False
+        if not fileobj:
+            fileobj = open(name, "r")
+            should_close = True
+        self._parse(fileobj)
+        if should_close:
+            fileobj.close()
+
+    def _parse(self, fileobj):
+        for line in fileobj:
+            var, _, value = line.partition('=')
+            if var in self._array_fields:
+                self._handle_assign_array(var, value)
+            elif var in self._checksum_fields:
+                self._handle_assign_checksum(var, value)
+            else:
+                self._handle_assign_value(var, value)
+        if self.release:
+            self.release = float(self.release)
+        self._substitute()
+
+    def _clean(self, value):
+        """Pythonize a bash string"""
+        return value.strip('\'" ')
+
+    def _clean_array(self, value):
+        """Pythonize a bash array"""
+        values = []
+        value = value.strip('()')
+        for element in value.split(' '):
+            clean = self._clean(element)
+            if len(clean) > 0:
+                values.append(self._clean(element))
+        return values
+
+    def _replace_symbol(self, matchobj):
+        """Replace a regex-matched variable with its value"""
+        name = matchobj.group('name').strip("{}")
+        if name in self._var_map:
+            name = self._var_map[name]
+        var = getattr(self, name)
+        # BUG: Might result in an infinite loop, oops!
+        return self._symbol_regex.sub(self._replace_symbol, var)
+
+    def _substitute(self):
+        """Substitute all bash variables within values with their values"""
+        for name in dir(self):
+            # We don't want private variables, release is a float and
+            # checksums shouldn't contain variables
+            if name[0] == '_' or name == 'release' or name == 'checksums':
+                continue
+            var = getattr(self, name)
+            # FIXME: This is icky
+            if isinstance(var, str):
+                result = self._symbol_regex.sub(self._replace_symbol, var)
+            else:
+                result = []
+                for element in var:
+                    a = self._symbol_regex.sub(self._replace_symbol, element)
+                    result.append(a)
+            setattr(self, name, result)
+
+    def _handle_assign_array(self, var, value):
+        """Parse a bash array and assign to the appropriate attribute"""
+        if var in self._var_map:
+            var = self._var_map[var]
+        setattr(self, var, self._clean_array(value))
+
+    def _handle_assign_checksum(self, var, value):
+        """Parse a checksum array and assign to the entry in :attr:`checksums`"""
+        key = var.replace('sums', '')
+        self.checksums[key] = self._clean_array(value)
+
+    def _handle_assign_value(self, var, value):
+        """Parse a bash value and assign to the appropriate attribute"""
+        if var in self._var_map:
+            var = self._var_map[var]
+        setattr(self, var, self._clean(value))
 
