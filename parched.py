@@ -183,6 +183,31 @@ class PacmanPackage(Package):
     builddate = None
     packager = None
     is_forced = False
+    _symbol_map = {
+        'pkgname': 'name',
+        'pkgver': 'version',
+        'pkgdesc': 'description',
+        'license': 'licenses',
+        'arch': 'architectures',
+        'force': 'is_forced',
+        'conflict': 'conflicts',
+        'group': 'groups',
+        'optdepend': 'optdepends',
+        'makepkgopt': 'options',
+        'depend': 'depends',
+    }
+    _arrays = (
+        'arch',
+        'license',
+        'replaces',
+        'group',
+        'depend',
+        'optdepend',
+        'conflict',
+        'provides',
+        'backup',
+        'makepkgopt',
+    )
 
     def __init__(self, name=None, tarfileobj=None):
         if not name and not tarfileobj:
@@ -201,37 +226,27 @@ class PacmanPackage(Package):
 
     def _parse(self, pkginfo):
         """Parse the .PKGINFO file"""
-        def handle_pkgver(v):
-            self.version, _, self.release = v.rpartition('-')
-            self.release = int(self.release)
-        handlers = {
-            'pkgname': lambda v: setattr(self, 'name', v),
-            'pkgver': handle_pkgver,
-            'pkgdesc': lambda v: setattr(self, 'description', v),
-            'url': lambda v: setattr(self, 'url', v),
-            'builddate': lambda v: setattr(self, 'builddate', datetime.utcfromtimestamp(int(v))),
-            'packager': lambda v: setattr(self, 'packager', v),
-            'size': lambda v: setattr(self, 'size', int(v)),
-            'arch': lambda v: self.architectures.append(v),
-            'license': lambda v: self.licenses.append(v),
-            'force': lambda v: setattr(self, 'is_forced', v == "True"),
-            'replaces': lambda v: self.replaces.append(v),
-            'group': lambda v: self.groups.append(v),
-            'depend': lambda v: self.depends.append(v),
-            'optdepend': lambda v: self.optdepends.append(v),
-            'conflict': lambda v: self.conflicts.append(v),
-            'provides': lambda v: self.provides.append(v),
-            'backup': lambda v: self.backup.append(v),
-            'makepkgopt': lambda v: self.options.append(v),
-        }
         for line in pkginfo:
             if line[0] == '#' or line.strip() == '':
                 continue
             var, _, value = line.strip().rpartition(' = ')
-            if var not in handlers.keys():
-                raise Exception('Uknown attribute "%s"' % var)
-            # Is there a nicer way to do this?
-            handlers[var](value)
+            real_name = var
+            if var in self._symbol_map:
+                real_name = self._symbol_map[var]
+            if var in self._arrays:
+                array = getattr(self, real_name)
+                array.append(value)
+            else:
+                setattr(self, real_name, value)
+        if self.size:
+            self.size = int(self.size)
+        if not self.is_forced == False:
+            self.is_forced = self.is_forced == "True"
+        if self.builddate:
+            self.builddate = datetime.utcfromtimestamp(int(self.builddate))
+        if self.version:
+            self.version, _, self.release = self.version.rpartition('-')
+            self.release = int(self.release)
         if self.packager == 'Uknown Packager':
             self.packager = None
 
