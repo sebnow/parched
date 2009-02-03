@@ -50,7 +50,8 @@ class Package(object):
 
     .. attribute:: release
 
-        Release version of the package, i.e., version of the package itself.
+        Release version of the package, i.e., version of the package itself,
+        as an integer.
 
     .. attribute:: description
 
@@ -92,6 +93,16 @@ class Package(object):
 
         A list of architectures the package can be installed on.
 
+    .. attribute:: backup
+
+        A list of files which should be backed up on upgrades
+
+    .. attribute:: options
+
+        Options used when building the package, represented as a list. This
+        list is equivalent to that of `options` in a PKGBUILD. See
+        :manpage:`PKGBUILD(5)` for more information.
+
     For more information about these attributes see :manpage:`PKGBUILD(5)`.
 
     """
@@ -108,6 +119,8 @@ class Package(object):
     conflicts = []
     replaces = []
     architectures = []
+    options = []
+    backup = []
 
     def __init__(self, pkgfile):
         raise NotImplementedError
@@ -166,22 +179,10 @@ class PacmanPackage(Package):
 
         Indicates whether an upgrade is forced
 
-    .. attribute:: backup
-
-        A list of files which should be backed up on upgrades
-
-    .. attribute:: makepkgopts
-
-        Options used when building the package, represented as a list. This
-        list is equivalent to that of `options` in a PKGBUILD. See
-        :manpage:`PKGBUILD(5)` for more information.
-
     """
     builddate = None
     packager = None
     is_forced = False
-    backup = []
-    makepkgopts = []
 
     def __init__(self, name=None, tarfileobj=None):
         if not name and not tarfileobj:
@@ -202,6 +203,7 @@ class PacmanPackage(Package):
         """Parse the .PKGINFO file"""
         def handle_pkgver(v):
             self.version, _, self.release = v.rpartition('-')
+            self.release = int(self.release)
         handlers = {
             'pkgname': lambda v: setattr(self, 'name', v),
             'pkgver': handle_pkgver,
@@ -209,10 +211,10 @@ class PacmanPackage(Package):
             'url': lambda v: setattr(self, 'url', v),
             'builddate': lambda v: setattr(self, 'builddate', datetime.utcfromtimestamp(int(v))),
             'packager': lambda v: setattr(self, 'packager', v),
-            'size': lambda v: setattr(self, 'size', v),
+            'size': lambda v: setattr(self, 'size', int(v)),
             'arch': lambda v: self.architectures.append(v),
             'license': lambda v: self.licenses.append(v),
-            'force': lambda v: setattr(self, 'is_forced', True),
+            'force': lambda v: setattr(self, 'is_forced', v == "True"),
             'replaces': lambda v: self.replaces.append(v),
             'group': lambda v: self.groups.append(v),
             'depend': lambda v: self.depends.append(v),
@@ -220,10 +222,10 @@ class PacmanPackage(Package):
             'conflict': lambda v: self.conflicts.append(v),
             'provides': lambda v: self.provides.append(v),
             'backup': lambda v: self.backup.append(v),
-            'makepkgopt': lambda v: self.makepkgopts.append(v),
+            'makepkgopt': lambda v: self.options.append(v),
         }
         for line in pkginfo:
-            if line[0] == '#':
+            if line[0] == '#' or line.strip() == '':
                 continue
             var, _, value = line.strip().rpartition(' = ')
             if var not in handlers.keys():
