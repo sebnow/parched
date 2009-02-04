@@ -374,7 +374,7 @@ class PKGBUILD(Package):
 
     def _parse(self, fileobj):
         for line in fileobj:
-            var, _, value = line.partition('=')
+            var, _, value = line.strip().partition('=')
             if var in self._array_fields:
                 self._handle_assign_array(var, value)
             elif var in self._checksum_fields:
@@ -430,7 +430,11 @@ class PKGBUILD(Package):
         """Parse a bash array and assign to the appropriate attribute"""
         if var in self._var_map:
             var = self._var_map[var]
-        setattr(self, var, self._clean_array(value))
+        # Only assign known variables
+        # This should always evaluate to true, since we only call the
+        # method for known arrays
+        if hasattr(self, var):
+            setattr(self, var, self._clean_array(value))
 
     def _handle_assign_checksum(self, var, value):
         """Parse a checksum array and assign to the entry in :attr:`checksums`"""
@@ -441,5 +445,7 @@ class PKGBUILD(Package):
         """Parse a bash value and assign to the appropriate attribute"""
         if var in self._var_map:
             var = self._var_map[var]
-        setattr(self, var, self._clean(value))
+        # Only assign known variables
+        if hasattr(self, var):
+            setattr(self, var, self._clean(value))
 
