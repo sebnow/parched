@@ -15,7 +15,7 @@ sys.path.append(os.path.abspath('../'))
 # General configuration
 # ---------------------
 
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.intersphinx']
+extensions = ['sphinx.ext.autodoc']
 templates_path = ['_templates']
 source_suffix = '.rst'
 master_doc = 'contents'
