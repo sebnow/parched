@@ -106,11 +106,11 @@ class Package(object):
     For more information about these attributes see :manpage:`PKGBUILD(5)`.
 
     """
-    name = None
-    version = None
-    release = None
-    description = None
-    url = None
+    name = ""
+    version = ""
+    release = ""
+    description = ""
+    url = ""
     licenses = []
     groups = []
     provides = []
@@ -180,9 +180,9 @@ class PacmanPackage(Package):
         Indicates whether an upgrade is forced
 
     """
-    builddate = None
-    packager = None
-    is_forced = False
+    builddate = ""
+    packager = ""
+    is_forced = ""
     _symbol_map = {
         'pkgname': 'name',
         'pkgver': 'version',
