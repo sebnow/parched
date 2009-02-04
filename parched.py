@@ -222,7 +222,7 @@ class PacmanPackage(Package):
             tarfileobj.close()
 
     def __str__(self):
-        print '%s %s-%s' % (self.name, self.version, self.release)
+        return '%s %s-%s' % (self.name, self.version, self.release)
 
     def _parse(self, pkginfo):
         """Parse the .PKGINFO file"""
