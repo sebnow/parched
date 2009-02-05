@@ -107,24 +107,23 @@ class Package(object):
     For more information about these attributes see :manpage:`PKGBUILD(5)`.
 
     """
-    name = ""
-    version = ""
-    release = ""
-    description = ""
-    url = ""
-    licenses = []
-    groups = []
-    provides = []
-    depends = []
-    optdepends = []
-    conflicts = []
-    replaces = []
-    architectures = []
-    options = []
-    backup = []
-
     def __init__(self, pkgfile):
-        raise NotImplementedError
+        super(Package, self).__init__()
+        self.name = ""
+        self.version = ""
+        self.release = ""
+        self.description = ""
+        self.url = ""
+        self.licenses = []
+        self.groups = []
+        self.provides = []
+        self.depends = []
+        self.optdepends = []
+        self.conflicts = []
+        self.replaces = []
+        self.architectures = []
+        self.options = []
+        self.backup = []
 
 
 class PacmanPackage(Package):
@@ -181,36 +180,37 @@ class PacmanPackage(Package):
         Indicates whether an upgrade is forced
 
     """
-    builddate = ""
-    packager = ""
-    is_forced = ""
-    _symbol_map = {
-        'pkgname': 'name',
-        'pkgver': 'version',
-        'pkgdesc': 'description',
-        'license': 'licenses',
-        'arch': 'architectures',
-        'force': 'is_forced',
-        'conflict': 'conflicts',
-        'group': 'groups',
-        'optdepend': 'optdepends',
-        'makepkgopt': 'options',
-        'depend': 'depends',
-    }
-    _arrays = (
-        'arch',
-        'license',
-        'replaces',
-        'group',
-        'depend',
-        'optdepend',
-        'conflict',
-        'provides',
-        'backup',
-        'makepkgopt',
-    )
-
     def __init__(self, name=None, tarfileobj=None):
+        super(PacmanPackage, self).__init__(tarfileobj)
+        self.builddate = ""
+        self.packager = ""
+        self.is_forced = ""
+        self.size = 0
+        self._symbol_map = {
+            'pkgname': 'name',
+            'pkgver': 'version',
+            'pkgdesc': 'description',
+            'license': 'licenses',
+            'arch': 'architectures',
+            'force': 'is_forced',
+            'conflict': 'conflicts',
+            'group': 'groups',
+            'optdepend': 'optdepends',
+            'makepkgopt': 'options',
+            'depend': 'depends',
+        }
+        self._arrays = (
+            'arch',
+            'license',
+            'replaces',
+            'group',
+            'depend',
+            'optdepend',
+            'conflict',
+            'provides',
+            'backup',
+            'makepkgopt',
+        )
         if not name and not tarfileobj:
             raise ValueError("nothing to open")
         should_close = False
@@ -316,54 +316,55 @@ class PKGBUILD(Package):
         the basenames of the URIs in :attr:`sources`
 
     """
-    install = ""
-    checksums = {
-        'md5': [],
-        'sha1': [],
-        'sha256': [],
-        'sha384': [],
-        'sha512': [],
-    }
-    noextract = []
-    sources = []
-    makedepends = []
-
-    # Symbol lookup table
-    _var_map = {
-        'pkgname': 'name',
-        'pkgver': 'version',
-        'pkgdesc': 'description',
-        'pkgrel': 'release',
-        'source': 'sources',
-        'arch': 'architectures',
-        'license': 'licenses',
-    }
-    _array_fields = (
-        'license',
-        'source',
-        'noextract',
-        'groups',
-        'arch',
-        'backup',
-        'depends',
-        'makedepends',
-        'optdepends',
-        'conflicts',
-        'provides',
-        'replaces',
-        'options',
-        'noextract',
-    )
-    _checksum_fields = (
-        'md5sums',
-        'sha1sums',
-        'sha256sums',
-        'sha384sums',
-        'sha512sums',
-    )
     _symbol_regex = re.compile(r"\$(?P<name>{[\w\d_]+}|[\w\d]+)")
 
     def __init__(self, name=None, fileobj=None):
+        super(PKGBUILD, self).__init__(fileobj)
+        self.install = ""
+        self.checksums = {
+            'md5': [],
+            'sha1': [],
+            'sha256': [],
+            'sha384': [],
+            'sha512': [],
+        }
+        self.noextract = []
+        self.sources = []
+        self.makedepends = []
+
+        # Symbol lookup table
+        self._var_map = {
+            'pkgname': 'name',
+            'pkgver': 'version',
+            'pkgdesc': 'description',
+            'pkgrel': 'release',
+            'source': 'sources',
+            'arch': 'architectures',
+            'license': 'licenses',
+        }
+        self._array_fields = (
+            'license',
+            'source',
+            'noextract',
+            'groups',
+            'arch',
+            'backup',
+            'depends',
+            'makedepends',
+            'optdepends',
+            'conflicts',
+            'provides',
+            'replaces',
+            'options',
+            'noextract',
+        )
+        self._checksum_fields = (
+            'md5sums',
+            'sha1sums',
+            'sha256sums',
+            'sha384sums',
+            'sha512sums',
+        )
         if not name and not fileobj:
             raise ValueError("nothing to open")
         should_close = False

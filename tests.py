@@ -22,13 +22,10 @@ import unittest
 from mock import Mock
 from datetime import datetime
 import time
+
 import parched
 
 class FileMock(Mock):
-    """A mock file object"""
-    _lines = []
-    name = None
-    
     def __init__(self, content, name=None):
         self._lines = content
         self.name = name
@@ -42,8 +39,9 @@ class FileMock(Mock):
 
 class TarFileMock(Mock):
     """A mock tarfile object"""
-    _files = {}
-    
+    def __init__(self, *args, **kwargs):
+       self._files = {}
+
     def add(self, fileobj):
         self._files[fileobj.name] = fileobj
 
@@ -53,32 +51,33 @@ class TarFileMock(Mock):
 
 
 class PackageGenerator(object):
-    name = None
-    version = None
-    release = None
-    description = None
-    url = None
-    groups = []
-    licenses = []
-    architectures = []
-    replaces = []
-    conflicts = []
-    provides = []
-    backup = []
-    options = []
+    def __init__(self):
+        super(PackageGenerator, self).__init__()
+        self.name = None
+        self.version = None
+        self.release = None
+        self.description = None
+        self.url = None
+        self.groups = []
+        self.licenses = []
+        self.architectures = []
+        self.replaces = []
+        self.conflicts = []
+        self.provides = []
+        self.backup = []
+        self.options = []
 
     def as_file(self, name):
         raise NotImplementedError
 
 
 class PacmanPackageGenerator(PackageGenerator):
-    builddate = datetime.utcnow()
-    size = 0
-    packager = None
-    is_forced = False
-    
     def __init__(self):
-        pass
+        super(PacmanPackageGenerator, self).__init__()
+        self.builddate = datetime.utcnow()
+        self.size = 0
+        self.packager = None
+        self.is_forced = False
     
     def as_file(self, name=".PKGINFO"):
         content = []
@@ -116,17 +115,19 @@ class PacmanPackageGenerator(PackageGenerator):
         return FileMock(content, name)
 
 class PKGBUILDGenerator(PackageGenerator):
-    install = None
-    makedepends = []
-    sources = []
-    checksums = {
-        'md5': [],
-        'sha1': [],
-        'sha256': [],
-        'sha384': [],
-        'sha512': [],
-    }
-    noextract = []
+    def __init__(self):
+        super(PKGBUILDGenerator, self).__init__()
+        self.install = None
+        self.makedepends = []
+        self.sources = []
+        self.checksums = {
+            'md5': [],
+            'sha1': [],
+            'sha256': [],
+            'sha384': [],
+            'sha512': [],
+        }
+        self.noextract = []
 
     def as_file(self, name="PKGBUILD"):
         content = []
