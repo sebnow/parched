@@ -374,17 +374,28 @@ class PKGBUILD(Package):
         if should_close:
             fileobj.close()
 
+    def _parse_line(self, line):
+        var, _, value = line.strip().partition('=')
+        if var in self._array_fields:
+            self._handle_assign_array(var, value)
+        elif var in self._checksum_fields:
+            self._handle_assign_checksum(var, value)
+        else:
+            self._handle_assign_value(var, value)
+
     def _parse(self, fileobj):
         if hasattr(fileobj, "seek"):
             fileobj.seek(0)
+        buf = []
         for line in fileobj:
-            var, _, value = line.strip().partition('=')
-            if var in self._array_fields:
-                self._handle_assign_array(var, value)
-            elif var in self._checksum_fields:
-                self._handle_assign_checksum(var, value)
-            else:
-                self._handle_assign_value(var, value)
+            # Accept multiline statments if escaped by a backslash
+            if line[-1] == '\\':
+                buf.append(line[:-1].strip())
+                continue
+            # Parse buffered multilines first
+            if len(buf) > 0:
+                self._parse_line(" ".join(buf))
+            self._parse_line(line)
         if self.release:
             self.release = float(self.release)
         self._substitute()

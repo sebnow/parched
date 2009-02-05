@@ -259,6 +259,23 @@ class PKGBUILDTest(unittest.TestCase):
         self.assertEquals(self.package.checksums, target.checksums)
         self.assertEquals(self.package.install, target.install)
 
+    def test_multiline(self):
+        try:
+            from cStringIO import StringIO
+        except ImportError:
+            import StringIO
+        pkgbuild = StringIO()
+        pkgbuild.write("""
+            source=(foo \
+            baz)
+            depends=(eggs \
+                spam\
+                pancakes)
+        """)
+        target = parched.PKGBUILD(fileobj=pkgbuild)
+        self.assertEquals(['foo', 'baz'], target.sources)
+        self.assertEquals(['eggs', 'spam', 'pancakes'], target.depends)
+
     def test_substitution(self):
         self.package.sources = [
             '$url/files/$pkgname-$pkgver.tar.gz',
