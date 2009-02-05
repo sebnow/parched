@@ -226,6 +226,8 @@ class PacmanPackage(Package):
         return '%s %s-%s' % (self.name, self.version, self.release)
 
     def _parse(self, pkginfo):
+        if hasattr(pkginfo, "seek"):
+            pkginfo.seek(0)
         """Parse the .PKGINFO file"""
         for line in pkginfo:
             if line[0] == '#' or line.strip() == '':
@@ -373,6 +375,8 @@ class PKGBUILD(Package):
             fileobj.close()
 
     def _parse(self, fileobj):
+        if hasattr(fileobj, "seek"):
+            fileobj.seek(0)
         for line in fileobj:
             var, _, value = line.strip().partition('=')
             if var in self._array_fields:
