@@ -389,6 +389,9 @@ class PKGBUILD(Package):
             fileobj.seek(0)
         buf = []
         for line in fileobj:
+            # Skip comments and empty lines
+            if line == '' or line[0] == '#':
+                continue
             # Accept multiline statments if escaped by a backslash
             if line[-1] == '\\':
                 buf.append(line[:-1].strip())
