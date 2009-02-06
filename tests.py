@@ -267,10 +267,10 @@ class PKGBUILDTest(unittest.TestCase):
             import StringIO
         pkgbuild = StringIO()
         pkgbuild.write("""
-            source=(foo \
+            source=(foo \\
             baz)
-            depends=(eggs \
-                spam\
+            depends=(eggs \\
+                spam\\
                 pancakes)
         """)
         target = parched.PKGBUILD(fileobj=pkgbuild)

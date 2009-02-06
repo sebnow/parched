@@ -389,17 +389,21 @@ class PKGBUILD(Package):
             fileobj.seek(0)
         buf = []
         for line in fileobj:
+            line = line.strip()
             # Skip comments and empty lines
             if line == '' or line[0] == '#':
                 continue
             # Accept multiline statments if escaped by a backslash
             if line[-1] == '\\':
-                buf.append(line[:-1].strip())
+                buf.append(line[:-1])
                 continue
             # Parse buffered multilines first
             if len(buf) > 0:
+                buf.append(line)
                 self._parse_line(" ".join(buf))
-            self._parse_line(line)
+                buf = []
+            else:
+                self._parse_line(line)
         if self.release:
             self.release = float(self.release)
         self._substitute()
