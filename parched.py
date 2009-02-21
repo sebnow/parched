@@ -343,22 +343,6 @@ class PKGBUILD(Package):
             'arch': 'architectures',
             'license': 'licenses',
         }
-        self._array_fields = (
-            'license',
-            'source',
-            'noextract',
-            'groups',
-            'arch',
-            'backup',
-            'depends',
-            'makedepends',
-            'optdepends',
-            'conflicts',
-            'provides',
-            'replaces',
-            'options',
-            'noextract',
-        )
         self._checksum_fields = (
             'md5sums',
             'sha1sums',
@@ -366,6 +350,9 @@ class PKGBUILD(Package):
             'sha384sums',
             'sha512sums',
         )
+        # Symbol table
+        self._symbols = {}
+
         if not name and not fileobj:
             raise ValueError("nothing to open")
         should_close = False
@@ -378,12 +365,11 @@ class PKGBUILD(Package):
 
     def _handle_assign(self, token):
         var, equals, value = token.strip().partition('=')
-        if var in self._array_fields:
-            self._handle_assign_array(var, value)
-        elif var in self._checksum_fields:
-            self._handle_assign_checksum(var, value)
+        # Is it an array?
+        if value[0] == '(' and value[-1] == ')':
+            self._symbols[var] = self._clean_array(value)
         else:
-            self._handle_assign_value(var, value)
+            self._symbols[var] = self._clean(value)
 
     def _parse(self, fileobj):
         """Parse PKGBUILD"""
@@ -419,9 +405,10 @@ class PKGBUILD(Package):
             # Assignment
             if re.match(r"^[\w\d_]+=", token):
                 self._handle_assign(token)
+        self._substitute()
+        self._assign_local()
         if self.release:
             self.release = float(self.release)
-        self._substitute()
 
     def _clean(self, value):
         """Pythonize a bash string"""
@@ -433,51 +420,36 @@ class PKGBUILD(Package):
 
     def _replace_symbol(self, matchobj):
         """Replace a regex-matched variable with its value"""
-        name = matchobj.group('name').strip("{}")
-        if name in self._var_map:
-            name = self._var_map[name]
-        var = getattr(self, name)
+        symbol = matchobj.group('name').strip("{}")
+        # If the symbol isn't found fallback to an empty string, like bash
+        try:
+            value = self._symbols[symbol]
+        except KeyError:
+            value = ''
         # BUG: Might result in an infinite loop, oops!
-        return self._symbol_regex.sub(self._replace_symbol, var)
+        return self._symbol_regex.sub(self._replace_symbol, value)
 
     def _substitute(self):
         """Substitute all bash variables within values with their values"""
-        for name in dir(self):
-            # We don't want private variables, release is a float and
-            # checksums shouldn't contain variables
-            if name[0] == '_' or name == 'release' or name == 'checksums':
-                continue
-            var = getattr(self, name)
+        for symbol in self._symbols:
+            value = self._symbols[symbol]
             # FIXME: This is icky
-            if isinstance(var, str):
-                result = self._symbol_regex.sub(self._replace_symbol, var)
+            if isinstance(value, str):
+                result = self._symbol_regex.sub(self._replace_symbol, value)
             else:
-                result = []
-                for element in var:
-                    a = self._symbol_regex.sub(self._replace_symbol, element)
-                    result.append(a)
-            setattr(self, name, result)
+                result = [self._symbol_regex.sub(self._replace_symbol, x)
+                    for x in value]
+            self._symbols[symbol] = result
 
-    def _handle_assign_array(self, var, value):
-        """Parse a bash array and assign to the appropriate attribute"""
-        if var in self._var_map:
-            var = self._var_map[var]
-        # Only assign known variables
-        # This should always evaluate to true, since we only call the
-        # method for known arrays
-        if hasattr(self, var):
-            setattr(self, var, self._clean_array(value))
-
-    def _handle_assign_checksum(self, var, value):
-        """Parse a checksum array and assign to the entry in :attr:`checksums`"""
-        key = var.replace('sums', '')
-        self.checksums[key] = self._clean_array(value)
-
-    def _handle_assign_value(self, var, value):
-        """Parse a bash value and assign to the appropriate attribute"""
-        if var in self._var_map:
-            var = self._var_map[var]
-        # Only assign known variables
-        if hasattr(self, var):
-            setattr(self, var, self._clean(value))
+    def _assign_local(self):
+        """Assign values from _symbols to PKGBUILD variables"""
+        for var in self._symbols:
+            value = self._symbols[var]
+            if var in self._checksum_fields:
+                key = var.replace('sums', '')
+                self.checksums[key] = value
+            else:
+                if var in self._var_map:
+                    var = self._var_map[var]
+                setattr(self, var, value)
 

@@ -287,6 +287,13 @@ class PKGBUILDTest(unittest.TestCase):
         ]
         self.assertEquals(parsed_sources, target.sources)
 
+    def test_non_standard_variable_substitution(self):
+        pkgbuild = StringIO("""
+            _pkgname=Foobar
+            sources=($_pkgname.tar.gz)
+        """)
+        target = parched.PKGBUILD(fileobj=pkgbuild)
+        self.assertEquals(["Foobar.tar.gz"], target.sources)
 
 if __name__ == "__main__":
     unittest.main()
