@@ -386,6 +386,7 @@ class PKGBUILD(Package):
             self._handle_assign_value(var, value)
 
     def _parse(self, fileobj):
+        """Parse PKGBUILD"""
         if hasattr(fileobj, "seek"):
             fileobj.seek(0)
         parser = shlex.shlex(fileobj, posix=True)
