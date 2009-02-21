@@ -227,9 +227,9 @@ class PacmanPackage(Package):
         return '%s %s-%s' % (self.name, self.version, self.release)
 
     def _parse(self, pkginfo):
+        """Parse the .PKGINFO file"""
         if hasattr(pkginfo, "seek"):
             pkginfo.seek(0)
-        """Parse the .PKGINFO file"""
         for line in pkginfo:
             if line[0] == '#' or line.strip() == '':
                 continue
