@@ -295,5 +295,16 @@ class PKGBUILDTest(unittest.TestCase):
         target = parched.PKGBUILD(fileobj=pkgbuild)
         self.assertEquals(["Foobar.tar.gz"], target.sources)
 
+    def test_skip_function(self):
+        pkgbuild = StringIO("""
+            pkgname=foo
+            build() {
+                pkgname=bar
+            }
+        """)
+        target = parched.PKGBUILD(fileobj=pkgbuild)
+        self.assertEquals("foo", target.name)
+
+
 if __name__ == "__main__":
     unittest.main()

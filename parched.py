@@ -377,13 +377,13 @@ class PKGBUILD(Package):
             fileobj.seek(0)
         parser = shlex.shlex(fileobj, posix=True)
         parser.whitespace_split = True
-        in_array = False
+        in_function = False
         while 1:
             token = parser.get_token()
             if token is None or token == '':
                 break
-            # Skip escaped newlines
-            if token == '\n':
+            # Skip escaped newlines and functions
+            if token == '\n' or in_function:
                 continue
             # Special case:
             # Array elements are dispersed among tokens, we have to join
@@ -405,6 +405,11 @@ class PKGBUILD(Package):
             # Assignment
             if re.match(r"^[\w\d_]+=", token):
                 self._handle_assign(token)
+            # Function definitions
+            elif token == '{':
+                in_function = True
+            elif token == '}' and in_function:
+                in_function = False
         self._substitute()
         self._assign_local()
         if self.release:
