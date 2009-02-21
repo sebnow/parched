@@ -267,6 +267,8 @@ class PKGBUILDTest(unittest.TestCase):
             depends=(eggs \\
                 spam\\
                 pancakes)
+            makedepends(funky_town # got to get funky!
+                pan)
         """)
         target = parched.PKGBUILD(fileobj=pkgbuild)
         self.assertEquals(['foo', 'baz'], target.sources)
