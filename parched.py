@@ -30,6 +30,7 @@ metadata about package.
 import tarfile
 from datetime import datetime
 import re
+import shlex
 
 __all__ = ['Package', 'PacmanPackage', 'PKGBUILD']
 
@@ -375,8 +376,8 @@ class PKGBUILD(Package):
         if should_close:
             fileobj.close()
 
-    def _parse_line(self, line):
-        var, _, value = line.strip().partition('=')
+    def _handle_assign(self, token):
+        var, equals, value = token.strip().partition('=')
         if var in self._array_fields:
             self._handle_assign_array(var, value)
         elif var in self._checksum_fields:
@@ -387,40 +388,47 @@ class PKGBUILD(Package):
     def _parse(self, fileobj):
         if hasattr(fileobj, "seek"):
             fileobj.seek(0)
-        buf = []
-        for line in fileobj:
-            line = line.strip()
-            # Skip comments and empty lines
-            if line == '' or line[0] == '#':
+        parser = shlex.shlex(fileobj, posix=True)
+        parser.whitespace_split = True
+        in_array = False
+        while 1:
+            token = parser.get_token()
+            if token is None or token == '':
+                break
+            # Skip escaped newlines
+            if token == '\n':
                 continue
-            # Accept multiline statments if escaped by a backslash
-            if line[-1] == '\\':
-                buf.append(line[:-1])
-                continue
-            # Parse buffered multilines first
-            if len(buf) > 0:
-                buf.append(line)
-                self._parse_line(" ".join(buf))
-                buf = []
-            else:
-                self._parse_line(line)
+            # Special case:
+            # Array elements are dispersed among tokens, we have to join
+            # them first
+            if token.find("=(") >= 0 and not token.rfind(")") >= 0:
+                in_array = True
+                elements = []
+                while in_array:
+                    _token = parser.get_token()
+                    if _token == '\n':
+                        continue
+                    if _token[-1] == ')':
+                        _token = '"%s")' % _token.strip(')')
+                        token = token.replace('=(', '=("', 1) + '"'
+                        token = " ".join((token, " ".join(elements), _token))
+                        in_array = False
+                    else:
+                        elements.append('"%s"' % _token.strip())
+            # Assignment
+            if re.match(r"^[\w\d_]+=", token):
+                self._handle_assign(token)
         if self.release:
             self.release = float(self.release)
         self._substitute()
 
     def _clean(self, value):
         """Pythonize a bash string"""
-        return value.strip('\'" ')
+        return " ".join(shlex.split(value))
 
     def _clean_array(self, value):
         """Pythonize a bash array"""
-        values = []
-        value = value.strip('()')
-        for element in value.split(' '):
-            clean = self._clean(element)
-            if len(clean) > 0:
-                values.append(self._clean(element))
-        return values
+        return shlex.split(value.strip('()'))
 
     def _replace_symbol(self, matchobj):
         """Replace a regex-matched variable with its value"""
