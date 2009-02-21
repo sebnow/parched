@@ -22,19 +22,18 @@ import unittest
 from mock import Mock
 from datetime import datetime
 import time
+from StringIO import StringIO # cStringIO.StringIO can't be subclassed
 
 import parched
 
-class FileMock(Mock):
-    def __init__(self, content, name=None):
-        self._lines = content
-        self.name = name
+class FileMock(StringIO):
+    def __init__(self, buffer, name=None):
+        self._name = name
+        StringIO.__init__(self, buffer)
 
-    def readlines(self):
-        return self._lines
-
-    def __iter__(self):
-        return self._lines.__iter__()
+    @property
+    def name(self):
+        return self._name
 
 
 class TarFileMock(Mock):
@@ -112,7 +111,7 @@ class PacmanPackageGenerator(PackageGenerator):
             content.append("backup = %s" % path)
         for option in self.options:
             content.append("makepkgopt = %s" % option)
-        return FileMock(content, name)
+        return FileMock("\n".join(content), name)
 
 class PKGBUILDGenerator(PackageGenerator):
     def __init__(self):
@@ -159,7 +158,7 @@ class PKGBUILDGenerator(PackageGenerator):
         content.append('noextract=(%s)' % " ".join(self.noextract))
         for k in self.checksums.keys():
             content.append('%ssums=(%s)' % (k, " ".join(self.checksums[k])))
-        return FileMock(content, name)
+        return FileMock("\n".join(content), name)
 
 
 class PacmanPackageTest(unittest.TestCase):
@@ -261,10 +260,6 @@ class PKGBUILDTest(unittest.TestCase):
         self.assertEquals(self.package.install, target.install)
 
     def test_multiline(self):
-        try:
-            from cStringIO import StringIO
-        except ImportError:
-            import StringIO
         pkgbuild = StringIO()
         pkgbuild.write("""
             source=(foo \\
