@@ -179,6 +179,10 @@ class PacmanPackage(Package):
     .. attribute:: is_force
 
         Indicates whether an upgrade is forced
+    
+    .. attribute:: files
+    
+        An array of files contained in the package
 
     """
     def __init__(self, name=None, tarfileobj=None):
@@ -187,6 +191,7 @@ class PacmanPackage(Package):
         self.packager = ""
         self.is_forced = ""
         self.size = 0
+        self.files = []
         self._symbol_map = {
             'pkgname': 'name',
             'pkgver': 'version',
@@ -219,6 +224,7 @@ class PacmanPackage(Package):
             tarfileobj = tarfile.open(str(name), "r|*")
             should_close = True
         pkginfo = tarfileobj.extractfile(".PKGINFO")
+        self.files = tarfileobj.getnames()
         self._parse(pkginfo)
         if should_close:
             tarfileobj.close()

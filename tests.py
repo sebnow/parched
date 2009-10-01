@@ -48,6 +48,10 @@ class TarFileMock(Mock):
         """Returns a :class:`FileMock` object"""
         return self._files[name]
 
+    def getnames(self):
+        """Return the members as a list of their names"""
+        return [self._files[k].name for k in self._files]
+
 
 class PackageGenerator(object):
     def __init__(self):
@@ -187,6 +191,7 @@ class PacmanPackageTest(unittest.TestCase):
 
         tarfile = TarFileMock()
         tarfile.add(self.package.as_file())
+        tarfile.add(FileMock("foo", "foo.txt"))
         target = parched.PacmanPackage(tarfileobj=tarfile)
 
         self.assertEquals(self.package.name, target.name)
@@ -206,6 +211,7 @@ class PacmanPackageTest(unittest.TestCase):
         self.assertEquals(self.package.provides, target.provides)
         self.assertEquals(self.package.backup, target.backup)
         self.assertEquals(self.package.options, target.options)
+        self.assertEquals(target.files, [".PKGINFO", "foo.txt"])
 
 class PKGBUILDTest(unittest.TestCase):
     def setUp(self):
