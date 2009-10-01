@@ -186,8 +186,8 @@ class PacmanPackageTest(unittest.TestCase):
         self.package.optdepends = ['ham']
         self.package.conflicts = ['gem']
         self.package.provides = ['lulz']
-        self.backup = ['/etc/test/test.conf']
-        self.options = ['!strip', '!info']
+        self.package.backup = ['/etc/test/test.conf']
+        self.package.options = ['!strip', '!info']
 
         tarfile = TarFileMock()
         tarfile.add(self.package.as_file())
