@@ -19,7 +19,6 @@
 # IN THE SOFTWARE.
 
 import unittest
-from mock import Mock
 from datetime import datetime
 import time
 from StringIO import StringIO # cStringIO.StringIO can't be subclassed
@@ -36,7 +35,7 @@ class FileMock(StringIO):
         return self._name
 
 
-class TarFileMock(Mock):
+class TarFileMock(object):
     """A mock tarfile object"""
     def __init__(self, *args, **kwargs):
        self._files = {}
