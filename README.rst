@@ -4,6 +4,13 @@ Overview
 Parched aims at providing a python module capable of parsing pacman packages
 and PKGBUILDs.
 
+Dependencies
+============
+
+* `Pyrex <http://www.cosc.canterbury.ac.nz/greg.ewing/python/Pyrex/>`_
+* `pkgparse <http://www.github.com/sebnow/pkgparse/>`_
+
+
 Installing
 ==========
 

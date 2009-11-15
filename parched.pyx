@@ -29,8 +29,7 @@ metadata about package.
 
 import tarfile
 from datetime import datetime
-import re
-import shlex
+cimport pkgparse
 
 __all__ = ['Package', 'PacmanPackage', 'PKGBUILD']
 
@@ -260,6 +259,43 @@ class PacmanPackage(Package):
         if self.packager == 'Uknown Packager':
             self.packager = None
 
+cdef extern from "stdio.h":
+    ctypedef struct FILE:
+        pass
+    FILE *fopen(char * __restrict, char * __restrict)
+cdef extern from "pkgparse.h":
+    ctypedef struct pkgbuild_t:
+        pass
+
+    pkgbuild_t *pkgbuild_parse(FILE *fp)
+    void pkgbuild_release(pkgbuild_t *pkgbuild)
+    pkgbuild_t *pkgbuild_retain(pkgbuild_t *pkgbuild)
+    char **pkgbuild_names(pkgbuild_t *pkgbuild)
+    char *pkgbuild_basename(pkgbuild_t *pkgbuild)
+    char *pkgbuild_version(pkgbuild_t *pkgbuild)
+    float pkgbuild_rel(pkgbuild_t *pkgbuild)
+    char *pkgbuild_desc(pkgbuild_t *pkgbuild)
+    char *pkgbuild_url(pkgbuild_t *pkgbuild)
+    char **pkgbuild_licenses(pkgbuild_t *pkgbuild)
+    char *pkgbuild_install(pkgbuild_t *pkgbuild)
+    char **pkgbuild_sources(pkgbuild_t *pkgbuild)
+    char **pkgbuild_noextract(pkgbuild_t *pkgbuild)
+    char **pkgbuild_md5sums(pkgbuild_t *pkgbuild)
+    char **pkgbuild_sha1sums(pkgbuild_t *pkgbuild)
+    char **pkgbuild_sha256sums(pkgbuild_t *pkgbuild)
+    char **pkgbuild_sha384sums(pkgbuild_t *pkgbuild)
+    char **pkgbuild_sha512sums(pkgbuild_t *pkgbuild)
+    char **pkgbuild_groups(pkgbuild_t *pkgbuild)
+    char **pkgbuild_architectures(pkgbuild_t *pkgbuild)
+    char **pkgbuild_backup(pkgbuild_t *pkgbuild)
+    char **pkgbuild_depends(pkgbuild_t *pkgbuild)
+    char **pkgbuild_makedepends(pkgbuild_t *pkgbuild)
+    char **pkgbuild_optdepends(pkgbuild_t *pkgbuild)
+    char **pkgbuild_conflicts(pkgbuild_t *pkgbuild)
+    char **pkgbuild_provides(pkgbuild_t *pkgbuild)
+    char **pkgbuild_replaces(pkgbuild_t *pkgbuild)
+    char **pkgbuild_options(pkgbuild_t *pkgbuild)
+    pkgbuild_t **pkgbuild_splitpkgs(pkgbuild_t *pkgbuild)
 
 class PKGBUILD(Package):
     """A :manpage:`PKGBUILD(5)` parser
@@ -323,10 +359,14 @@ class PKGBUILD(Package):
         the basenames of the URIs in :attr:`sources`
 
     """
-    _symbol_regex = re.compile(r"\$(?P<name>{[\w\d_]+}|[\w\d]+)")
 
     def __init__(self, name=None, fileobj=None):
-        super(PKGBUILD, self).__init__(fileobj)
+        cdef FILE *fp
+        cdef pkgbuild_t *pkgbuild
+
+        super(PKGBUILD, self).__init__(None)
+
+        self.names = []
         self.install = ""
         self.checksums = {
             'md5': [],
@@ -339,128 +379,50 @@ class PKGBUILD(Package):
         self.sources = []
         self.makedepends = []
 
-        # Symbol lookup table
-        self._var_map = {
-            'pkgname': 'name',
-            'pkgver': 'version',
-            'pkgdesc': 'description',
-            'pkgrel': 'release',
-            'source': 'sources',
-            'arch': 'architectures',
-            'license': 'licenses',
-        }
-        self._checksum_fields = (
-            'md5sums',
-            'sha1sums',
-            'sha256sums',
-            'sha384sums',
-            'sha512sums',
-        )
-        # Symbol table
-        self._symbols = {}
+        if not name and fileobj:
+            raise NotImplementedError("libpkgparse does not support fileobj")
 
         if not name and not fileobj:
             raise ValueError("nothing to open")
-        should_close = False
-        if not fileobj:
-            fileobj = open(name, "r")
-            should_close = True
-        self._parse(fileobj)
-        if should_close:
-            fileobj.close()
+        fp = fopen(name, "r")
+        pkgbuild = pkgbuild_parse(fp)
+        if pkgbuild != NULL:
+            self.names = _to_list(pkgbuild_names(pkgbuild))
+            self.name = self.names[0]
+            print("version")
+            if pkgbuild_version(pkgbuild) != NULL:
+                self.version = pkgbuild_version(pkgbuild)
+            self.release = pkgbuild_rel(pkgbuild)
+            if pkgbuild_desc(pkgbuild) != NULL:
+                self.description = pkgbuild_desc(pkgbuild)
+            if pkgbuild_url(pkgbuild) != NULL:
+                self.url = pkgbuild_url(pkgbuild)
 
-    def _handle_assign(self, token):
-        var, equals, value = token.strip().partition('=')
-        # Is it an array?
-        if value[0] == '(' and value[-1] == ')':
-            self._symbols[var] = self._clean_array(value)
-        else:
-            self._symbols[var] = self._clean(value)
+            self.licenses = _to_list(pkgbuild_licenses(pkgbuild))
+            self.sources = _to_list(pkgbuild_sources(pkgbuild))
+            self.noextract = _to_list(pkgbuild_noextract(pkgbuild))
+            self.checksums['md5'] = _to_list(pkgbuild_md5sums(pkgbuild))
+            self.checksums['sha1'] = _to_list(pkgbuild_sha1sums(pkgbuild))
+            self.checksums['sha256'] = _to_list(pkgbuild_sha256sums(pkgbuild))
+            self.checksums['sha384'] = _to_list(pkgbuild_sha384sums(pkgbuild))
+            self.checksums['sha512'] = _to_list(pkgbuild_sha512sums(pkgbuild))
+            self.groups = _to_list(pkgbuild_groups(pkgbuild))
+            self.architectures = _to_list(pkgbuild_architectures(pkgbuild))
+            self.backup = _to_list(pkgbuild_backup(pkgbuild))
+            self.makedepends = _to_list(pkgbuild_makedepends(pkgbuild))
+            self.conflicts = _to_list(pkgbuild_conflicts(pkgbuild))
+            self.provides = _to_list(pkgbuild_provides(pkgbuild))
+            self.replaces = _to_list(pkgbuild_replaces(pkgbuild))
+            self.options = _to_list(pkgbuild_options(pkgbuild))
+            self.optdepends = _to_list(pkgbuild_optdepends(pkgbuild))
 
-    def _parse(self, fileobj):
-        """Parse PKGBUILD"""
-        if hasattr(fileobj, "seek"):
-            fileobj.seek(0)
-        parser = shlex.shlex(fileobj, posix=True)
-        parser.whitespace_split = True
-        in_function = False
-        while 1:
-            token = parser.get_token()
-            if token is None or token == '':
-                break
-            # Skip escaped newlines and functions
-            if token == '\n' or in_function:
-                continue
-            # Special case:
-            # Array elements are dispersed among tokens, we have to join
-            # them first
-            if token.find("=(") >= 0 and not token.rfind(")") >= 0:
-                in_array = True
-                elements = []
-                while in_array:
-                    _token = parser.get_token()
-                    if _token == '\n':
-                        continue
-                    if _token[-1] == ')':
-                        _token = '"%s")' % _token.strip(')')
-                        token = token.replace('=(', '=("', 1) + '"'
-                        token = " ".join((token, " ".join(elements), _token))
-                        in_array = False
-                    else:
-                        elements.append('"%s"' % _token.strip())
-            # Assignment
-            if re.match(r"^[\w\d_]+=", token):
-                self._handle_assign(token)
-            # Function definitions
-            elif token == '{':
-                in_function = True
-            elif token == '}' and in_function:
-                in_function = False
-        self._substitute()
-        self._assign_local()
-        if self.release:
-            self.release = float(self.release)
 
-    def _clean(self, value):
-        """Pythonize a bash string"""
-        return " ".join(shlex.split(value))
-
-    def _clean_array(self, value):
-        """Pythonize a bash array"""
-        return shlex.split(value.strip('()'))
-
-    def _replace_symbol(self, matchobj):
-        """Replace a regex-matched variable with its value"""
-        symbol = matchobj.group('name').strip("{}")
-        # If the symbol isn't found fallback to an empty string, like bash
-        try:
-            value = self._symbols[symbol]
-        except KeyError:
-            value = ''
-        # BUG: Might result in an infinite loop, oops!
-        return self._symbol_regex.sub(self._replace_symbol, value)
-
-    def _substitute(self):
-        """Substitute all bash variables within values with their values"""
-        for symbol in self._symbols:
-            value = self._symbols[symbol]
-            # FIXME: This is icky
-            if isinstance(value, str):
-                result = self._symbol_regex.sub(self._replace_symbol, value)
-            else:
-                result = [self._symbol_regex.sub(self._replace_symbol, x)
-                    for x in value]
-            self._symbols[symbol] = result
-
-    def _assign_local(self):
-        """Assign values from _symbols to PKGBUILD variables"""
-        for var in self._symbols:
-            value = self._symbols[var]
-            if var in self._checksum_fields:
-                key = var.replace('sums', '')
-                self.checksums[key] = value
-            else:
-                if var in self._var_map:
-                    var = self._var_map[var]
-                setattr(self, var, value)
-
+cdef _to_list(char **array):
+    cdef int i
+    return_list = []
+    i = 0
+    if array != NULL:
+        while array[i] != NULL:
+            return_list.append(array[i])
+            i += 1
+    return return_list
