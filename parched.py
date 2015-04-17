@@ -422,8 +422,16 @@ class PKGBUILD(Package):
             self.release = float(self.release)
 
     def _clean(self, value):
-        """Pythonize a bash string"""
-        return " ".join(shlex.split(value))
+        """Pythonize a bash string.
+
+        shlex strips enclosing double quotes from right-hand side of
+        assignment, but not enclosing single quotes.
+
+        """
+        if value.startswith("'") and value.endswith("'"):
+            return value.strip("'")
+        else:
+            return value
 
     def _clean_array(self, value):
         """Pythonize a bash array"""
